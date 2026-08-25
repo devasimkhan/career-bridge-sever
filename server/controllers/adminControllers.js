@@ -110,31 +110,56 @@ const getAllCounselor = async (req, res) => {
   res.status(200).json(allCounselor);
 };
 
-const UpdateCounselor = async (req, res) => {
-  let counselorId = req.params.cnid;
-  const counselor = await Counselor.findById(counselorId);
-  if (!counselor) {
-    res.status(409);
-    throw new Error("Counselor Not Found");
-  }
+// const UpdateCounselor = async (req, res) => {
+//   let counselorId = req.params.cnid;
+//   const counselor = await Counselor.findById(counselorId);
+//   if (!counselor) {
+//     res.status(409);
+//     throw new Error("Counselor Not Found");
+//   }
 
-  const UpdatedCounselor = await Counselor.findByIdAndUpdate(
-    counselor._id,
-    req.body,
-    { new: true },
-  )
-    .populate("user")
-    .populate("category");
+//   const UpdatedCounselor = await Counselor.findByIdAndUpdate(
+//     counselor._id,
+//     req.body,
+//     { new: true },
+//   )
+//     .populate("user")
+//     .populate("category");
 
-  if (req.body.status === "accepted") {
-    const updateUser = await User.findByIdAndUpdate(
-      counselor.user,
-      { userType: "COUNSELOR" },
-      { new: true },
-    );
-  }
-  res.status(200).json(UpdatedCounselor);
-};
+//   if (req.body.status === "accepted") {
+//     const updateUser = await User.findByIdAndUpdate(
+//       counselor.user,
+//       { userType: "COUNSELOR" },
+//       { new: true },  
+//     );
+//   }
+//   res.status(200).json(UpdatedCounselor);
+// };
+
+const updateCounselor = async (req, res) => {
+
+    const counselor = await Counselor.findById(req.params.cnid)
+
+    if (!counselor) {
+        res.status(404)
+        throw new Error('Counselor Not Found')
+    }
+
+    const updatedCounselor = await Counselor.findByIdAndUpdate(counselor._id, req.body, { new: true }).populate('user').populate('category')
+
+    if (req.body.status === "accepted") {
+        const updatedUser = await User.findByIdAndUpdate(counselor.user, { userType: "COUNSELOR" }, { new: true })
+    }
+
+    if (!updatedCounselor) {
+        res.status(409)
+        throw new Error("Counselor not updated")
+    }
+
+    res.status(200).json(updatedCounselor)
+
+}
+
 
 const getAllCreditsRequest = async (req, res) => {
   const creditRequest = await Credit.find().populate("user");
@@ -222,7 +247,7 @@ const adminControllers = {
   getAllCareer,
   getCareerByCategoryId,
   getAllCounselor,
-  UpdateCounselor,
+  updateCounselor,
   getAllCreditsRequest,
   updatedCreditRequest,
   getAllRoadsMap,
