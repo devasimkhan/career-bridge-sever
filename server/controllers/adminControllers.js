@@ -110,55 +110,31 @@ const getAllCounselor = async (req, res) => {
   res.status(200).json(allCounselor);
 };
 
-// const UpdateCounselor = async (req, res) => {
-//   let counselorId = req.params.cnid;
-//   const counselor = await Counselor.findById(counselorId);
-//   if (!counselor) {
-//     res.status(409);
-//     throw new Error("Counselor Not Found");
-//   }
-
-//   const UpdatedCounselor = await Counselor.findByIdAndUpdate(
-//     counselor._id,
-//     req.body,
-//     { new: true },
-//   )
-//     .populate("user")
-//     .populate("category");
-
-//   if (req.body.status === "accepted") {
-//     const updateUser = await User.findByIdAndUpdate(
-//       counselor.user,
-//       { userType: "COUNSELOR" },
-//       { new: true },  
-//     );
-//   }
-//   res.status(200).json(UpdatedCounselor);
-// };
-
 const updateCounselor = async (req, res) => {
+  let counselorId = req.params.cnid;
+  const counselor = await Counselor.findById(counselorId);
+  if (!counselor) {
+    res.status(409);
+    throw new Error("Counselor Not Found");
+  }
 
-    const counselor = await Counselor.findById(req.params.cnid)
+  const UpdatedCounselor = await Counselor.findByIdAndUpdate(
+    counselor._id,
+    req.body,
+    { new: true },
+  )
+    .populate("user")
+    .populate("category");
 
-    if (!counselor) {
-        res.status(404)
-        throw new Error('Counselor Not Found')
-    }
-
-    const updatedCounselor = await Counselor.findByIdAndUpdate(counselor._id, req.body, { new: true }).populate('user').populate('category')
-
-    if (req.body.status === "accepted") {
-        const updatedUser = await User.findByIdAndUpdate(counselor.user, { userType: "COUNSELOR" }, { new: true })
-    }
-
-    if (!updatedCounselor) {
-        res.status(409)
-        throw new Error("Counselor not updated")
-    }
-
-    res.status(200).json(updatedCounselor)
-
-}
+  if (req.body.status === "accepted") {
+    const updateUser = await User.findByIdAndUpdate(
+      counselor.user,
+      { userType: "COUNSELOR" },
+      { new: true },
+    );
+  }
+  res.status(200).json(UpdatedCounselor);
+};
 
 
 const getAllCreditsRequest = async (req, res) => {
@@ -171,36 +147,84 @@ const getAllCreditsRequest = async (req, res) => {
   res.status(200).json(creditRequest);
 };
 
+// const updatedCreditRequest = async (req, res) => {
+//   const { status } = req.body;
+
+//   if (!status) {
+//     res.status(409);
+//     throw new Error("Please Enter Status");
+//   }
+
+//   const creditRequest = await Credit.findById(req.params.rid);
+
+//   if (!creditRequest) {
+//     res.status(404);
+//     throw new Error("Request Not Found");
+//   }
+
+//   const user = await User.findById(creditRequest.user);
+
+//   if (!user) {
+//     res.status(404);
+//     throw new Error("User Not Found");
+//   }
+
+//   const updatedCreditRequest = await Credit.findByIdAndUpdate(
+//     creditRequest._id,
+//     { status },
+//     { new: true },
+//   );
+//   res.status(200).json(updatedCreditRequest);
+// };
 const updatedCreditRequest = async (req, res) => {
-  const { status } = req.body;
+    const { status } = req.body;
 
-  if (!status) {
-    res.status(409);
-    throw new Error("Please Enter Status");
-  }
+    if (!status) {
+        res.status(409);
+        throw new Error("Please send status");
+    }
 
-  const creditRequest = await Credit.findById(req.params.rid);
+    const creditRequest = await Credit.findById(req.params.rid);
 
-  if (!creditRequest) {
-    res.status(404);
-    throw new Error("Request Not Found");
-  }
+    if (!creditRequest) {
+        res.status(404);
+        throw new Error("Credit Request Not Found!");
+    }
 
-  const user = await User.findById(creditRequest.user);
+    // Find User
+    const user = await User.findById(creditRequest.user);
 
-  if (!user) {
-    res.status(404);
-    throw new Error("User Not Found");
-  }
+    if (!user) {
+        res.status(404);
+        throw new Error("No User Found!");
+    }
 
-  const updatedCreditRequest = await Credit.findByIdAndUpdate(
-    creditRequest._id,
-    { status },
-    { new: true },
-  );
-  res.status(200).json(updatedCreditRequest);
+    // Grant credits only when status is granted
+    if (status === "granted") {
+        await User.findByIdAndUpdate(
+            user._id,
+            {
+                credits: user.credits + creditRequest.credits
+            },
+            {
+                new: true
+            }
+        );
+    }
+
+    // Update credit request status
+    const updatedCreditRequest = await Credit.findByIdAndUpdate(
+        creditRequest._id,
+        {
+            status
+        },
+        {
+            new: true
+        }
+    ).populate("user");
+
+    res.status(200).json(updatedCreditRequest);
 };
-
 const getAllRoadsMap = async (req, res) => {
   const roadmaps = await Roadmap.find().populate("user");
 
@@ -212,32 +236,28 @@ const getAllRoadsMap = async (req, res) => {
   res.status(200).json(roadmaps);
 };
 
+const updateUser = async (req, res) => {
+  const userId = req.params.uid;
 
-const updateUser = async(req ,res) => {
+  const user = await User.findById(userId);
 
-const userId = req.params.uid
+  if (!user) {
+    res.status(404);
+    throw new Error("user Is Not Found");
+  }
 
-const user = await User.findById(userId) 
+  const updatedUser = await User.findByIdAndUpdate(
+    user._id,
+    { isActive: !user.isActive },
+    { new: true },
+  );
 
-if(!user) {
-  res.status(404)
-  throw new Error("user Is Not Found")
-}
-
-const updatedUser = await User.findByIdAndUpdate(user._id , {isActive : !user.isActive} , {new  : true})
-
-if(!updatedUser){
-  res.status(409)
-  throw new Error("User Not Updated ");
-  
-}
-res.status(200).json(updatedUser)
- 
-
-
-}
-
-
+  if (!updatedUser) {
+    res.status(409);
+    throw new Error("User Not Updated ");
+  }
+  res.status(200).json(updatedUser);
+};
 
 const adminControllers = {
   getAllUser,
@@ -251,7 +271,7 @@ const adminControllers = {
   getAllCreditsRequest,
   updatedCreditRequest,
   getAllRoadsMap,
-  updateUser
+  updateUser,
 };
 
 export default adminControllers;
