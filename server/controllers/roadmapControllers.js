@@ -5,10 +5,11 @@ import Category from "../models/categoryModel.js";
 import Rating from "../models/ratingModel.js";
 import Credit from "../models/creditsModel.js";
 import Counselor from "../models/counselorModel.js";
+import Roadmap from "../models/roadmapModel.js";
 
 export const generateRoadmap = async (req, res) => {
   try {
-    // const ai = new GoogleGenAI({});
+    const ai = new GoogleGenAI({});
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -27,9 +28,8 @@ export const generateRoadmap = async (req, res) => {
       { new: true },
     );
 
-    console.log(user);
     const { name, email, qualification, location } = user;
-    const { interest, skill_level, budget, learning_mode } = req.body;
+    const { interest, skill_level, budget, learning_mode , additional_info } = req.body;
 
     if (!interest || !skill_level || !budget || !learning_mode) {
       res.status(409);
@@ -57,7 +57,8 @@ HERE IS MY DETAILS :
  interest : ${interest} ,
  skills_level : ${skill_level} ,
  budget : ${budget} ,
- learning_mode : ${learning_mode}
+ learning_mode : ${learning_mode} ,
+ additional_info : ${additional_info}
             
 
 ## YOUR TASK
@@ -109,17 +110,44 @@ One practical, encouraging tip to keep momentum.
       input: SYSTEM_PROMPT,
     });
     let data = interaction.output_text;
-
+    
+    const roadmap = await Roadmap.create({
+      text :data ,
+      user : user._id
+    })
+    
+    
     res.status(200).json({
       message: "Roadmap Generated",
-      road: data,
+      roadmap: roadmap,
+      credits : userUpdated.credits
     });
   } catch (error) {
     res.status(409);
-    throw new Error("Unable To Generate Roadmap insuuficeint Credits");
+    throw new Error(error.message);
   }
 };
 
+export const getMyRoadmap = async(req, res) => {
+
+const user = await User.findById(req.user)
+
+if(!user){
+  res.status(404)
+  throw new Error("User is Not Found ");
+  
+}
+
+const roadmap = await Roadmap.find({user : user._id})
+
+if(!roadmap){
+  res.status(404)
+  throw new Error("NO Roadmap Found");
+  
+}
+res.status(200).json(roadmap)
+
+}
 export const AdminAiChat = async (req, res) => {
   const { question } = req.body;
   if (!question) {
