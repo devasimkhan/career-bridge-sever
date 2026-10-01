@@ -87,6 +87,26 @@ const getConversation = async (req, res) => {
     return res.status(200).json([]);
   }
 
+  // Mark all unread messages sent by other to me as read + set seenAt
+  const now = new Date();
+  await Message.updateMany(
+    { sender: other, receiver: me, isRead: false },
+    { $set: { isRead: true, seenAt: now } }
+  );
+
+  try {
+    const io = req.app.get("io");
+    if (io) {
+      io.to(roomName(me, other)).emit("messages_seen", {
+        readerId: String(me),
+        senderId: String(other),
+        seenAt: now,
+      });
+    }
+  } catch {
+    // ignore socket emit error
+  }
+
   const messages = await Message.find({
     $or: [
       { sender: me, receiver: other },

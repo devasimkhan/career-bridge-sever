@@ -20,6 +20,10 @@ isRead : {
     type : Boolean ,
     default : false
 } ,
+seenAt : {
+    type : Date ,
+    default : null
+} ,
 // Per-user "clear chat": jis user ne history delete ki, uska id yahan push hota hai.
 // Dusre user ko messages ab bhi dikhenge.
 deletedFor : [{
