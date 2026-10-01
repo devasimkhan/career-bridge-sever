@@ -2,9 +2,8 @@ import Message from "../models/messageModel.js";
 import User from "../models/userModels.js";
 import { roomName } from "../socket/chatHandel.js";
 
-// GET /api/messages â€” inbox: last message per contact + unread count
-// Jis user ne message kiya ho, vah contact list me dikhega
-// Counselor ke liye: sirf STUDENT contacts dikhenge, aur counselor-counselor purane messages permanent delete honge
+// GET /api/messages — inbox: last message per contact + unread count
+// Counselor ke liye: sirf STUDENT contacts + student ka latest message (not counselor's own reply)
 const getInbox = async (req, res) => {
   const me = req.user._id;
 
@@ -27,8 +26,7 @@ const getInbox = async (req, res) => {
     if (!other) continue;
     const otherId = String(other._id || other);
 
-    // Agar logged-in user COUNSELOR hai aur samne wala user bhi COUNSELOR hai ya STUDENT nahi hai:
-    // Unke beech ke purane messages DB se permanently delete honge aur inbox me nahi aayenge
+    // Counselor-to-Counselor messages permanently delete karo
     if (isCounselor && other.userType === "COUNSELOR") {
       await Message.deleteMany({
         $or: [
@@ -48,13 +46,24 @@ const getInbox = async (req, res) => {
         user: other,
         lastMessage: msg.content,
         lastMessageAt: msg.createdAt,
+        lastMessageSender: isSelfSender ? "me" : "them",
         lastMessageId: msg._id,
         unreadCount: 0,
+        _hasStudentMsg: !isSelfSender,
       });
+    } else {
+      const existing = inboxMap.get(otherId);
+      // Counselor ke liye: student ka latest message prefer karo
+      if (isCounselor && !existing._hasStudentMsg && !isSelfSender) {
+        existing.lastMessage = msg.content;
+        existing.lastMessageAt = msg.createdAt;
+        existing.lastMessageSender = "them";
+        existing._hasStudentMsg = true;
+      }
     }
   }
 
-  // Unread count per contact (receiver = me, isRead = false, mere liye deleted nahi)
+  // Unread count per contact
   const unreadAgg = await Message.aggregate([
     { $match: { receiver: me, isRead: false, deletedFor: { $ne: me } } },
     { $group: { _id: "$sender", count: { $sum: 1 } } },
@@ -66,17 +75,29 @@ const getInbox = async (req, res) => {
     }
   }
 
-  res.status(200).json([...inboxMap.values()]);
+  const result = [...inboxMap.values()].map(({ _hasStudentMsg, ...rest }) => rest);
+  res.status(200).json(result);
 };
 
-// GET /api/messages/:uid â€” conversation between logged-in user and :uid
+// GET /api/messages/:uid — conversation between logged-in user and :uid
 const getConversation = async (req, res) => {
   const me = req.user._id;
   const other = req.params.uid;
 
+  if (!other || String(other) === String(me)) {
+    res.status(400);
+    throw new Error("Invalid conversation user");
+  }
+
   const meUser = await User.findById(me).select("userType");
   const otherUser = await User.findById(other).select("userType");
 
+  if (!otherUser) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Counselor-to-Counselor: block & clear
   if (meUser?.userType === "COUNSELOR" && otherUser?.userType === "COUNSELOR") {
     await Message.deleteMany({
       $or: [
@@ -89,14 +110,15 @@ const getConversation = async (req, res) => {
 
   // Mark all unread messages sent by other to me as read + set seenAt
   const now = new Date();
-  await Message.updateMany(
+  const updateResult = await Message.updateMany(
     { sender: other, receiver: me, isRead: false },
     { $set: { isRead: true, seenAt: now } }
   );
 
+  // Realtime: dono users ko seen status broadcast karo
   try {
     const io = req.app.get("io");
-    if (io) {
+    if (io && updateResult.modifiedCount > 0) {
       io.to(roomName(me, other)).emit("messages_seen", {
         readerId: String(me),
         senderId: String(other),
@@ -121,10 +143,39 @@ const getConversation = async (req, res) => {
   res.status(200).json(messages);
 };
 
+// POST /api/messages/mark-seen/:uid — mark messages from :uid as read
+const markSeen = async (req, res) => {
+  const me = req.user._id;
+  const other = req.params.uid;
 
+  if (!other || String(other) === String(me)) {
+    res.status(400);
+    throw new Error("Invalid user");
+  }
 
-// DELETE /api/messages/conversation/:uid â€” poori chat history clear (sirf mere liye)
-// Dusre user ki history safe rehti hai (per-user delete via deletedFor)
+  const now = new Date();
+  const updateResult = await Message.updateMany(
+    { sender: other, receiver: me, isRead: false },
+    { $set: { isRead: true, seenAt: now } }
+  );
+
+  try {
+    const io = req.app.get("io");
+    if (io && updateResult.modifiedCount > 0) {
+      io.to(roomName(me, other)).emit("messages_seen", {
+        readerId: String(me),
+        senderId: String(other),
+        seenAt: now,
+      });
+    }
+  } catch {
+    // ignore
+  }
+
+  res.status(200).json({ success: true, markedCount: updateResult.modifiedCount });
+};
+
+// DELETE /api/messages/conversation/:uid — poori chat history clear (sirf mere liye)
 const clearConversation = async (req, res) => {
   const me = req.user._id;
   const other = req.params.uid;
@@ -152,9 +203,7 @@ const clearConversation = async (req, res) => {
   });
 };
 
-// DELETE /api/messages/message/:mid â€” single message delete
-// Sender apna message sabke liye delete karta hai (hard delete + realtime notify),
-// receiver/dusra user sirf apne liye hide karta hai
+// DELETE /api/messages/message/:mid — single message delete
 const deleteMessage = async (req, res) => {
   const me = req.user._id;
   const mid = req.params.mid;
@@ -176,7 +225,6 @@ const deleteMessage = async (req, res) => {
     const sender = String(message.sender);
     const receiver = String(message.receiver);
     await message.deleteOne();
-    // Realtime: dono ke open chat se message turant hatao
     try {
       const io = req.app.get("io");
       if (io) {
@@ -186,7 +234,7 @@ const deleteMessage = async (req, res) => {
         });
       }
     } catch {
-      // socket emit fail ho to bhi delete success mana jayega
+      // socket emit fail ho to bhi delete success
     }
     return res.status(200).json({
       success: true,
@@ -206,9 +254,11 @@ const deleteMessage = async (req, res) => {
   });
 };
 
-// GET /api/messages/user-info/:uid â€” fetch user info (name, profilePic) for direct chat
+// GET /api/messages/user-info/:uid — fetch user info for direct chat
 const getTargetUser = async (req, res) => {
-  const user = await User.findById(req.params.uid).select("name profilePic qualification location userType");
+  const user = await User.findById(req.params.uid).select(
+    "name profilePic qualification location userType"
+  );
   if (!user) {
     res.status(404);
     throw new Error("User Not Found");
@@ -216,7 +266,13 @@ const getTargetUser = async (req, res) => {
   res.status(200).json(user);
 };
 
-const messageControllers = { getConversation, getInbox, clearConversation, deleteMessage, getTargetUser };
+const messageControllers = {
+  getConversation,
+  getInbox,
+  clearConversation,
+  deleteMessage,
+  getTargetUser,
+  markSeen,
+};
 
 export default messageControllers;
-

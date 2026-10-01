@@ -16,29 +16,27 @@ import http from "http"
 import { Server } from "socket.io"
 import { chatHandler } from "./socket/chatHandel.js"
 import socketAuthMiddleware from "./socket/socketAuth.js"
-import { Socket } from "dgram"
 const PORT = process.env.PORT || 3000
 
 const app = express()
 const server = http.createServer(app)
 connectDB()
 
-const io = new Server (server , {
-   cors :{
-    origin : process.env.CLIENT_URL || "http://localhost:5173" ,
-    credentials : true
+const io = new Server(server, {
+   cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true
    }
 })
 
 io.use(socketAuthMiddleware)
 
 // controllers (message delete realtime notify) ke liye io available rakho
-app.set("io" , io)
+app.set("io", io)
 
-
-io.on("connection" , (socket) => {
-    console.log(`User connected ;${socket.userId}`) 
-    chatHandler(io , socket)
+io.on("connection", (socket) => {
+    console.log(`User connected: ${socket.userID}`)
+    chatHandler(io, socket)
 })
 
 app.use(express.json())

@@ -39,10 +39,34 @@ export const chatHandler = (io, socket) => {
         sender: message.sender,
         receiver: message.receiver,
         content: message.content,
+        isRead: message.isRead,
+        seenAt: message.seenAt,
         createdAt: message.createdAt,
       });
     } catch (error) {
       socket.emit("message_error", { error: "Error in sending message" });
+    }
+  });
+
+  // Socket-based seen: jab receiver chat khola ho aur naye messages aayein
+  // Frontend "mark_seen" emit karta hai — DB update + broadcast
+  socket.on("mark_seen", async ({ viewerId, senderId }) => {
+    if (!viewerId || !senderId) return;
+    try {
+      const now = new Date();
+      const result = await Message.updateMany(
+        { sender: senderId, receiver: viewerId, isRead: false },
+        { $set: { isRead: true, seenAt: now } }
+      );
+      if (result.modifiedCount > 0) {
+        io.to(roomName(viewerId, senderId)).emit("messages_seen", {
+          readerId: String(viewerId),
+          senderId: String(senderId),
+          seenAt: now,
+        });
+      }
+    } catch {
+      // ignore DB error
     }
   });
 
