@@ -30,14 +30,12 @@ const requestCredits = async (req, res) => {
 //  puri credits user Dekh sakta hai
 
 const getAllCreditRequestHistory = async (req, res) => {
-  const allCreditsRequests = await Credit.findOne({
+  const allCreditsRequests = await Credit.find({
     user: req.user.id,
-  }).populate("user");
+  })
+    .populate("user")
+    .sort({ createdAt: -1 });
 
-  if (!allCreditsRequests) {
-    res.status(404);
-    throw new Error("Not Credits Here");
-  }
   res.status(200).json(allCreditsRequests);
 };
 

@@ -4,6 +4,7 @@ import Counselor from "../models/counselorModel.js";
 import Credit from "../models/creditsModel.js";
 import Roadmap from "../models/roadmapModel.js";
 import User from "../models/userModels.js";
+import Message from "../models/messageModel.js";
 
 const getAllUser = async (req, res) => {
   const allUsers = await User.find();
@@ -127,6 +128,12 @@ const updateCounselor = async (req, res) => {
     .populate("category");
 
   if (req.body.status === "accepted") {
+    // Role change: STUDENT -> COUNSELOR
+    // Permanently delete all old student-counselor messages for this user from MongoDB
+    await Message.deleteMany({
+      $or: [{ sender: counselor.user }, { receiver: counselor.user }],
+    });
+
     const updateUser = await User.findByIdAndUpdate(
       counselor.user,
       { userType: "COUNSELOR" },

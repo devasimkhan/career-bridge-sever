@@ -10,6 +10,8 @@ import counselorRoutes from "./routes/counselorRoutes.js"
 import ratingRoutes from "./routes/ratingRoutes.js"
 import creditsRoutes from "./routes/creditsRoutes.js"
 import roadmapRoutes from "./routes/roadmapRoutes.js"
+import messageRoutes from "./routes/messageRoutes.js"
+import dashboardRoutes from "./routes/dashboardRoutes.js"
 import http from "http"
 import { Server } from "socket.io"
 import { chatHandler } from "./socket/chatHandel.js"
@@ -29,6 +31,9 @@ const io = new Server (server , {
 })
 
 io.use(socketAuthMiddleware)
+
+// controllers (message delete realtime notify) ke liye io available rakho
+app.set("io" , io)
 
 
 io.on("connection" , (socket) => {
@@ -63,9 +68,17 @@ app.use("/api/credits" , creditsRoutes)
 //  road map routes
 app.use("/api/ai" , roadmapRoutes)
 
+//  messages routes
+app.use("/api/messages" , messageRoutes)
+
+//  user dashboard (StudentDashboard at /auth/profile)
+app.use("/api/user" , dashboardRoutes)
+// alias so /api/dashboard also works
+app.use("/api" , dashboardRoutes)
+
 // error handler
 app.use(errorHandler)
-app.listen(PORT , () => console.log(`SERVER RUNNING AT PORT ,${PORT}`.bgBlue) )
+server.listen(PORT , () => console.log(`SERVER RUNNING AT PORT ,${PORT}`.bgBlue) )
 
 
 

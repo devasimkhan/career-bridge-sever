@@ -1,7 +1,6 @@
 import User from "../models/userModels.js";
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken";
-import fs  from  "node:fs"
 import uploadToCloudinary from "../middleware/cloudinaryMiddleware.js";
 
 const registerUser = async (req, res) => {
@@ -31,8 +30,12 @@ const registerUser = async (req, res) => {
   const salt = bcrypt.genSaltSync(10);
 const hashedPassword = bcrypt.hashSync( password, salt);
 
+  if (!req.file) {
+    res.status(409);
+    throw new Error("Please upload a profile photo");
+  }
+
 let uploadResult = await uploadToCloudinary(req.file.path)
-fs.unlinkSync(req.file.path)
   const user = await User.create({
     name , email , phone , password: hashedPassword , qualification , location , profilePic : uploadResult.secure_url
   })
@@ -93,6 +96,7 @@ if(user && bcrypt.compareSync(password, user.password) ){
     isActive : user.isActive ,
     credits : user.credits ,
     userSince : user.createdAt ,
+    profilePic : user.profilePic ,
     token : generateToken(user._id)
   })
 }

@@ -19,7 +19,14 @@ content : {
 isRead : {
     type : Boolean ,
     default : false
-}
+} ,
+// Per-user "clear chat": jis user ne history delete ki, uska id yahan push hota hai.
+// Dusre user ko messages ab bhi dikhenge.
+deletedFor : [{
+    type : mongoose.Schema.Types.ObjectId ,
+    ref : "User" ,
+    default : []
+}]
 
 } ,
  {
@@ -28,6 +35,10 @@ isRead : {
 
 
 messageSchema.index({sender :1 , receiver : 1 , createdAt : -1})
+
+// 24 ghante purane messages DB se automatic permanent delete (TTL index)
+// MongoDB background me har ~60 sec check karke expire hue docs hata deta hai
+messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 })
 
 
 const Message = mongoose.model("Message" , messageSchema)
