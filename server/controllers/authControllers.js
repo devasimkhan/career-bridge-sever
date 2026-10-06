@@ -1,127 +1,221 @@
+// import User from "../models/userModels.js";
+// import bcrypt from "bcrypt"
+// import jwt from "jsonwebtoken";
+// import uploadToCloudinary from "../middleware/cloudinaryMiddleware.js";
+
+// const registerUser = async (req, res) => {
+//   const { name, email, phone, password, qualification, location } = req.body;
+
+//   if (!name || !email || !phone || !password || !qualification || !location) {
+//     res.status(409);
+//     throw new Error("Please Enter All Details....");
+//   }
+
+//   if (phone.length !== 10) {
+//     res.status(409);
+//     throw new Error("Please Enter Valid Number");
+//   }
+
+
+//   let emailExit = await User.findOne({ email: email });
+//   let phoneExit = await User.findOne({ phone: phone });
+
+//   if (emailExit || phoneExit) {
+//     res.status(409);
+//     throw new Error("User All Ready Register");
+//   }
+
+
+
+//   const salt = bcrypt.genSaltSync(10);
+//   const hashedPassword = bcrypt.hashSync(password, salt);
+
+//   if (!req.file) {
+//     res.status(409);
+//     throw new Error("Please upload a profile photo");
+//   }
+
+//   let uploadResult = await uploadToCloudinary(req.file.path)
+//   const user = await User.create({
+//     name, email, phone, password: hashedPassword, qualification, location, profilePic: uploadResult.secure_url
+//   })
+//   if (!user) {
+//     res.status(409)
+//     throw new Error("User Is Not Created..");
+
+//   }
+//   res.status(201).json({
+//     _id: user._id,
+//     name: user.name,
+//     email: user.email,
+//     phone: user.phone,
+//     qualification: user.qualification,
+//     location: user.location,
+//     userType: user.userType,
+//     isActive: user.isActive,
+//     credits: user.credits,
+//     userSince: user.createdAt,
+//     profilePic: user.profilePic,
+//     token: generateToken(user._id),
+
+//   })
+
+
+
+// };
 import User from "../models/userModels.js";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import uploadToCloudinary from "../middleware/cloudinaryMiddleware.js";
 
 const registerUser = async (req, res) => {
-  const { name, email, phone, password, qualification, location  } = req.body;
 
-  if (!name || !email || !phone || !password || !qualification || !location) {
+
+  const {
+    name,
+    email,
+    phone,
+    password,
+    qualification,
+    location
+  } = req.body;
+
+  // Check all required fields
+  if (
+    !name ||
+    !email ||
+    !phone ||
+    !password ||
+    !qualification ||
+    !location
+  ) {
     res.status(409);
     throw new Error("Please Enter All Details....");
   }
 
+  // Validate phone
   if (phone.length !== 10) {
     res.status(409);
     throw new Error("Please Enter Valid Number");
   }
 
+  // Check existing email
+  const emailExist = await User.findOne({ email });
 
-  let emailExit = await User.findOne({ email: email });
-  let phoneExit = await User.findOne({ phone: phone });
+  // Check existing phone
+  const phoneExist = await User.findOne({ phone });
 
-  if (emailExit || phoneExit) {
+  if (emailExist || phoneExist) {
     res.status(409);
     throw new Error("User All Ready Register");
   }
 
-
-
-  const salt = bcrypt.genSaltSync(10);
-const hashedPassword = bcrypt.hashSync( password, salt);
-
+  // Check profile image
   if (!req.file) {
     res.status(409);
     throw new Error("Please upload a profile photo");
   }
 
-let uploadResult = await uploadToCloudinary(req.file.path)
+  // Hash password
+  const salt = bcrypt.genSaltSync(10);
+  const hashedPassword = bcrypt.hashSync(password, salt);
+
+  // Upload image directly from memory to Cloudinary
+  const uploadResult = await uploadToCloudinary(req.file.buffer);
+
+  // Create user
   const user = await User.create({
-    name , email , phone , password: hashedPassword , qualification , location , profilePic : uploadResult.secure_url
-  })
-  if(!user){
-    res.status(409)
+    name,
+    email,
+    phone,
+    password: hashedPassword,
+    qualification,
+    location,
+    profilePic: uploadResult.secure_url
+  });
+
+  if (!user) {
+    res.status(409);
     throw new Error("User Is Not Created..");
-    
   }
+
+  // Send response
   res.status(201).json({
-    _id : user._id ,
-    name : user.name ,
-    email : user.email ,
-    phone : user.phone ,
-    qualification :user.qualification ,
-    location : user.location ,
-    userType : user.userType ,
-    isActive : user.isActive ,
-    credits : user.credits ,
-    userSince : user.createdAt ,
-    profilePic : user.profilePic ,
-    token : generateToken(user._id) ,
-
-  })
-
-
-
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    qualification: user.qualification,
+    location: user.location,
+    userType: user.userType,
+    isActive: user.isActive,
+    credits: user.credits,
+    userSince: user.createdAt,
+    profilePic: user.profilePic,
+    token: generateToken(user._id)
+  });
 };
+
+
+
+
 const loginUser = async (req, res) => {
+  const { email, password } = req.body;
 
-const {email , password} = req.body
- 
-if(!email || !password) {
-  res.status(409)
-   throw new Error("Please fill all details");
-   
-}
+  if (!email || !password) {
+    res.status(409);
+    throw new Error("Please fill all details");
+  }
 
-const user = await User.findOne({email:email})
- 
-if(!user.isActive)
-{
-  res.status(401)
-  throw new Error("Your account has been suspend contact Admin");
-  
-}
+  const user = await User.findOne({ email: email });
 
+  if (!user) {
+    res.status(401);
+    throw new Error("Invalid Credentials!");
+  }
 
-if(user && bcrypt.compareSync(password, user.password) ){
-  res.status(200)
-    res.status(201).json({
-    _id : user._id ,
-    name : user.name ,
-    email : user.email ,
-    phone : user.phone ,
-    qualification :user.qualification ,
-    location : user.location ,
-    userType : user.userType ,
-    isActive : user.isActive ,
-    credits : user.credits ,
-    userSince : user.createdAt ,
-    profilePic : user.profilePic ,
-    token : generateToken(user._id)
-  })
-}
-else {
-  res.status(401)
-  throw new Error("Invalid Credentials!")
-}
+  if (!user.isActive) {
+    res.status(401);
+    throw new Error("Your account has been suspend contact Admin");
+  }
+
+  if (user && bcrypt.compareSync(password, user.password)) {
+    res.status(200);
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      qualification: user.qualification,
+      location: user.location,
+      userType: user.userType,
+      isActive: user.isActive,
+      credits: user.credits,
+      userSince: user.createdAt,
+      profilePic: user.profilePic,
+      token: generateToken(user._id)
+    });
+  } else {
+    res.status(401);
+    throw new Error("Invalid Credentials!");
+  }
 };
 
 const generateToken = (id) => {
-  return jwt.sign({id} , process.env.JWT_SECRET , {expiresIn : '30d'})
-}
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
 
-
-const privateController = async(req, res) => {
-
+const privateController = async (req, res) => {
   res.json({
-    message : `Request made by : ${req.user.name}`
-  })
-} 
+    message: `Request made by : ${req.user.name}`
+  });
+};
 
 const authControllers = {
   registerUser,
-  loginUser , 
+  loginUser,
   privateController
 };
 
 export default authControllers;
+
