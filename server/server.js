@@ -12,6 +12,7 @@ import creditsRoutes from "./routes/creditsRoutes.js"
 import roadmapRoutes from "./routes/roadmapRoutes.js"
 import messageRoutes from "./routes/messageRoutes.js"
 import dashboardRoutes from "./routes/dashboardRoutes.js"
+import cors from "cors"
 import http from "http"
 import { Server } from "socket.io"
 import { chatHandler } from "./socket/chatHandel.js"
@@ -22,9 +23,16 @@ const app = express()
 const server = http.createServer(app)
 connectDB()
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:5050"
+].filter(Boolean);
+
 const io = new Server(server, {
    cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || true,
     credentials: true
    }
 })
@@ -39,8 +47,12 @@ io.on("connection", (socket) => {
     chatHandler(io, socket)
 })
 
+app.use(cors({
+  origin: process.env.CLIENT_URL || true,
+  credentials: true
+}))
 app.use(express.json())
-app.use(express.urlencoded())
+app.use(express.urlencoded({ extended: true }))
 
 
 app.get("/" , (req , res) => {

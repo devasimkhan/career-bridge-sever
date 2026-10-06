@@ -1,4 +1,5 @@
 import Message from "../models/messageModel.js";
+import User from "../models/userModels.js";
 
 export const onlineUsers = new Map();
 
@@ -15,6 +16,9 @@ export const chatHandler = (io, socket) => {
     onlineUsers.set(userId, new Set());
   }
   onlineUsers.get(userId).add(socket.id);
+
+  // Personal room: bina chat khole bhi receiver tak notification pahunche
+  socket.join(`user_${userId}`);
 
   // Naye connected user ko abhi-online sabki list bhejo (initial sync)
   socket.emit("online_list", { onlineUsers: [...onlineUsers.keys()] });
@@ -34,13 +38,27 @@ export const chatHandler = (io, socket) => {
         receiver: receiverId,
         content: content.trim(),
       });
-      io.to(roomName(senderID, receiverId)).emit("receiver_message", {
+      const senderDoc = await User.findById(senderID).select("name profilePic");
+      const payload = {
         _id: message._id,
         sender: message.sender,
         receiver: message.receiver,
         content: message.content,
         isRead: message.isRead,
         seenAt: message.seenAt,
+        createdAt: message.createdAt,
+        senderName: senderDoc?.name || null,
+        senderPic: senderDoc?.profilePic || null,
+      };
+      io.to(roomName(senderID, receiverId)).emit("receiver_message", payload);
+      // Receiver ke personal room me notification â€” room join na ho tab bhi pahunche
+      io.to(`user_${receiverId}`).emit("new_message", {
+        messageId: message._id,
+        senderId: String(senderID),
+        receiverId: String(receiverId),
+        senderName: senderDoc?.name || "User",
+        senderPic: senderDoc?.profilePic || null,
+        content: message.content,
         createdAt: message.createdAt,
       });
     } catch (error) {
@@ -49,7 +67,7 @@ export const chatHandler = (io, socket) => {
   });
 
   // Socket-based seen: jab receiver chat khola ho aur naye messages aayein
-  // Frontend "mark_seen" emit karta hai — DB update + broadcast
+  // Frontend "mark_seen" emit karta hai ï¿½ DB update + broadcast
   socket.on("mark_seen", async ({ viewerId, senderId }) => {
     if (!viewerId || !senderId) return;
     try {

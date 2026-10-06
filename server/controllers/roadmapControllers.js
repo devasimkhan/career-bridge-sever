@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import User from "../models/userModels.js";
 import Career from "../models/careerModel.js";
@@ -7,9 +6,6 @@ import Rating from "../models/ratingModel.js";
 import Credit from "../models/creditsModel.js";
 import Counselor from "../models/counselorModel.js";
 import Roadmap from "../models/roadmapModel.js";
-
-
-
 
 const generateWithFallback = async (ai, prompt) => {
   const models = [
@@ -42,20 +38,16 @@ const generateWithFallback = async (ai, prompt) => {
     } catch (error) {
       lastError = error;
 
-      console.error(
-        `Model ${model} failed:`,
-        error.message
-      );
+      console.error(`Model ${model} failed:`, error.message);
     }
   }
 
   throw new Error(
     `All Gemini models failed. Last error: ${
       lastError?.message || "Unknown error"
-    }`
+    }`,
   );
 };
-
 
 // ======================================
 // GENERATE ROADMAP
@@ -88,12 +80,7 @@ export const generateRoadmap = async (req, res) => {
       });
     }
 
-    const {
-      name,
-      email,
-      qualification,
-      location,
-    } = user;
+    const { name, email, qualification, location } = user;
 
     const {
       interest,
@@ -190,10 +177,7 @@ RULES:
 `;
 
     // Try Gemini models one by one
-    const data = await generateWithFallback(
-      ai,
-      SYSTEM_PROMPT
-    );
+    const data = await generateWithFallback(ai, SYSTEM_PROMPT);
 
     // Deduct credit atomically after successful AI response
     const userUpdated = await User.findOneAndUpdate(
@@ -206,7 +190,7 @@ RULES:
       },
       {
         new: true,
-      }
+      },
     );
 
     if (!userUpdated) {
@@ -230,7 +214,6 @@ RULES:
       roadmap,
       credits: userUpdated.credits,
     });
-
   } catch (error) {
     console.error("Roadmap AI Error:", error);
 
@@ -252,7 +235,6 @@ RULES:
     });
   }
 };
-
 
 // ======================================
 // GET MY ROADMAPS
@@ -278,7 +260,6 @@ export const getMyRoadmap = async (req, res) => {
       count: roadmaps.length,
       roadmaps,
     });
-
   } catch (error) {
     console.error("Get My Roadmap Error:", error);
 
@@ -288,7 +269,6 @@ export const getMyRoadmap = async (req, res) => {
     });
   }
 };
-
 
 // ======================================
 // ADMIN AI CHAT
@@ -310,24 +290,16 @@ export const AdminAiChat = async (req, res) => {
     });
 
     // Fetch dashboard data
-    const [
-      users,
-      careers,
-      categories,
-      ratings,
-      credits,
-      counselors,
-    ] = await Promise.all([
-      User.find()
-        .select("-password -refreshToken")
-        .lean(),
+    const [users, careers, categories, ratings, credits, counselors] =
+      await Promise.all([
+        User.find().select("-password -refreshToken").lean(),
 
-      Career.find().lean(),
-      Category.find().lean(),
-      Rating.find().lean(),
-      Credit.find().lean(),
-      Counselor.find().lean(),
-    ]);
+        Career.find().lean(),
+        Category.find().lean(),
+        Rating.find().lean(),
+        Credit.find().lean(),
+        Counselor.find().lean(),
+      ]);
 
     const dataset = {
       users,
@@ -362,17 +334,13 @@ ${question}
 `;
 
     // Automatically fallback across models
-    const data = await generateWithFallback(
-      ai,
-      SYSTEM_PROMPT
-    );
+    const data = await generateWithFallback(ai, SYSTEM_PROMPT);
 
     return res.status(200).json({
       success: true,
       message: "Response Arrived",
       answer: data,
     });
-
   } catch (error) {
     console.error("Admin AI Chat Error:", error);
 

@@ -154,7 +154,6 @@ const getAllCreditsRequest = async (req, res) => {
   res.status(200).json(creditRequest);
 };
 
-// const updatedCreditRequest = async (req, res) => {
 //   const { status } = req.body;
 
 //   if (!status) {
